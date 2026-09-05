@@ -21,9 +21,9 @@ Respond with ONLY a JSON object, no markdown fences, matching exactly:
   "flow": null | {
     "title": "what moves, max 44 chars (e.g. 'Signup submit, guarded')",
     "narration": "1-2 spoken sentences walking the viewer along the arrows in order",
-    "nodes": [ { "id": "a", "label": "max 18 chars", "kind": "ui" | "api" | "data" | "service" | "job" | "external" } ],
+    "nodes": [ { "id": "a", "label": "max 24 chars, a noun (Sign up button, POST /signup, users table)", "kind": "ui" | "api" | "data" | "service" | "job" | "external" } ],
     "edges": [ { "from": "a", "to": "b", "label": "verb, max 16 chars (submits, writes, calls, returns)" } ],
-    "changed": ["ids of nodes this session added or changed"]
+    "changed": ["ids of the 1 or 2 nodes this session actually added or altered; the rest are context"]
   }
 }
 Rules: 2-4 plays, each about one real thing that happened (feature built, bug fixed, decision made).
@@ -172,7 +172,7 @@ export function normalise(s, projectName) {
     s.flow = {
       title: String(f.title || "How it moves").slice(0, 44),
       narration: String(f.narration),
-      nodes: f.nodes.slice(0, 6).map((n) => ({ id: String(n.id), label: String(n.label).slice(0, 18), kind: FLOW_KINDS.includes(n.kind) ? n.kind : "service" })),
+      nodes: f.nodes.slice(0, 6).map((n) => ({ id: String(n.id), label: String(n.label).slice(0, 24), kind: FLOW_KINDS.includes(n.kind) ? n.kind : "service" })),
       edges: f.edges.slice(0, 7).map((e) => ({ from: String(e.from), to: String(e.to), label: String(e.label || "").slice(0, 16) })),
       changed: (Array.isArray(f.changed) ? f.changed : []).map(String).filter((id) => f.nodes.some((n) => String(n.id) === id)),
     };
