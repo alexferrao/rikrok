@@ -12,51 +12,62 @@ Rik Rok watches your coding-agent sessions. When one goes idle after real work, 
 
 Everything runs on your machine. Sessions are read from disk, scripts come from a local LLM, narration from a 20-second recording of you, rendering from Remotion. No cloud, no accounts, no telemetry. Your voice never leaves the machine.
 
-## Quickstart (macOS)
+## Get started
+
+Three ways to run it. Pick one; they all end in the same feed.
+
+| | Scripts written by | Voice | Needs | Best for |
+|---|---|---|---|---|
+| **1. Claude writes it** (easiest) | Claude Code, headless, on your subscription | your own voice via `rikrok voice serve`, or the Mac voice | Claude Code installed, ffmpeg | anyone already using Claude Code |
+| **2. Local model** | Ollama or LM Studio | same | a local model server | keeping recaps entirely offline |
+| **3. Mac, one server** | oMLX | oMLX (same server) | Apple Silicon, oMLX | one process for scripts, voice and QA |
+
+The session already went through Claude, so asking Claude to write the recap adds nothing new; the voice and the render stay on your machine in every option.
+
+### 1. Claude writes it
 
 ```bash
 npm install -g rikrok        # or: npx rikrok ...
-rikrok setup                 # guided: finds or installs a local LLM, records your voice, renders the first reel
+rikrok setup                 # answers: yes to Claude writing the recaps, yes to the hook, record your voice
 ```
 
-That is the whole setup for most people. The rest of this section is the same thing by hand.
+That is the whole setup. From then on, when you leave a Claude Code session that did real work, a reel is built in the background and appears in the feed. By hand, the same thing is:
 
 ```bash
-rikrok doctor                # checks ffmpeg, sessions, LLM, voice, render browser
-```
-
-Point it at a local LLM. Ollama is the default:
-
-```bash
-ollama pull qwen3:8b
-export RIKROK_LLM_MODEL=qwen3:8b
-export RIKROK_LLM_EXTRA='{"think":false}'    # thinking models: keep the JSON clean
-```
-
-Then:
-
-```bash
-rikrok backfill --limit 3    # recap your 3 most recent sessions now
+rikrok hook install          # SessionEnd hook: recap when you leave a session
+rikrok voice setup           # 22 seconds of you, see "Your own voice"
+rikrok voice serve           # a local cloning server, or skip and use the Mac voice for now
 rikrok feed                  # http://127.0.0.1:4870
+rikrok install               # keep the feed (and voice server) running at login
 ```
 
-Open the feed, tap Start scrolling, swipe. To keep it running at login:
-
-```bash
-rikrok install               # launchd agents for the watcher and the feed
-```
-
-No LLM yet? Everything still works: reels use a plain template script built from commits, files and todos. Set the model later.
+`rikrok watch` is the alternative trigger: it recaps sessions that go idle for 15 minutes, hook or no hook. Use both if you tend to leave sessions open.
 
 Want to see one first? `rikrok demo` renders a reel from a bundled sample session.
 
+### 2. Local model
+
+```bash
+ollama pull qwen3:8b
+export RIKROK_SCRIPT=local RIKROK_LLM_MODEL=qwen3:8b
+export RIKROK_LLM_EXTRA='{"think":false}'    # thinking models: keep the JSON clean
+rikrok backfill --limit 3 && rikrok feed
+```
+
+`rikrok setup` walks through this too (answer no to Claude writing the recaps). LM Studio works the same way on port 1234. No model reachable? Reels still ship with a plain template script built from commits, files and todos.
+
+### 3. Mac, one server: oMLX
+
+See "One server on a Mac: oMLX" under Configuration. `rikrok setup` finds it and wires everything.
+
 ## When does a session earn a reel?
 
-The watcher never reads a session while you are in it. It waits for silence, checks there was real work, then builds. Five numbers decide everything.
+Two triggers, same rules. The hook fires when you leave a session; the watcher catches sessions left open that go quiet. Neither reads a session while you are typing in it. Then the same checks: real work, and only what is new since the last recap.
 
 ```mermaid
 flowchart LR
-  A["~/.claude/projects<br/>*.jsonl, read only"] -- "every 60 s" --> B{"idle?<br/>no writes for 15 min"}
+  H["you leave a session<br/>(SessionEnd hook)"] --> C
+  A["~/.claude/projects<br/>*.jsonl, read only"] -- "watcher, every 60 s" --> B{"idle?<br/>no writes for 15 min"}
   B -- yes --> C{"real work?<br/>10+ turns, 3+ tool calls"}
   C -- yes --> D{"new since last recap?"}
   D -- yes --> E["build reel<br/>max 4 / hour"]
@@ -77,11 +88,11 @@ All five are settings (`RIKROK_IDLE_MINUTES`, `RIKROK_MIN_TURNS`, `RIKROK_MIN_TO
 
 ## What goes into the script?
 
-The log is condensed to about a page of evidence and handed to your local model with a fixed grammar. If the model fails twice, a template writes the same shape from the raw facts. A reel always ships.
+The log is condensed to about a page of evidence and handed to the script writer (Claude Code headless, or your local model) with a fixed grammar. If the model fails twice, a template writes the same shape from the raw facts. A reel always ships.
 
 ```mermaid
 flowchart LR
-  E["evidence (condensed)<br/>last 6 prompts you typed<br/>last 8 assistant notes<br/>15 files edited, 10 commands<br/>git log for the window<br/>todo list, last snapshot<br/>URLs it mentioned<br/>last recap's next step"] --> L["local LLM<br/>strict JSON, 2 tries"]
+  E["evidence (condensed)<br/>last 6 prompts you typed<br/>last 8 assistant notes<br/>15 files edited, 10 commands<br/>git log for the window<br/>todo list, last snapshot<br/>URLs it mentioned<br/>last recap's next step"] --> L["script writer<br/>Claude Code headless, or a local model<br/>strict JSON, 2 tries"]
   L --> S["script (fixed grammar)<br/>headline + narration<br/>done / open counts<br/>2 to 4 plays with evidence<br/>flow: nodes, edges, what changed<br/>status: shipped, open<br/>next step: one action"]
   L -. "invalid twice" .-> T["template fallback"] --> S
   S --> N["narrate, one clip per beat<br/>clip length sets card time"] --> R["render 1080x1920"]
@@ -132,6 +143,8 @@ Environment variables, or the same keys in `~/.rikrok/config.json`. `rikrok conf
 |---|---|---|
 | `RIKROK_HOME` | `~/.rikrok` | Data directory |
 | `RIKROK_CLAUDE_DIR` | `~/.claude/projects` | Where Claude Code keeps sessions |
+| `RIKROK_SCRIPT` | `auto` | Who writes the script: `claude` (headless Claude Code), `local` (server below), `auto` = local if a model is set, else Claude if the CLI exists |
+| `RIKROK_CLAUDE_MODEL` / `_BIN` | `sonnet` / `claude` | Model alias and binary for the Claude path |
 | `RIKROK_LLM_URL` | `http://127.0.0.1:11434` | OpenAI-compatible chat server (Ollama, LM Studio, oMLX, vLLM) |
 | `RIKROK_LLM_MODEL` | unset | Model name. Unset means template scripts only |
 | `RIKROK_LLM_KEY` | unset | Bearer token if your server wants one |
@@ -210,7 +223,7 @@ Comments are always saved to the reel's sidecar JSON as well.
 
 ## Privacy
 
-Session content never leaves your machine unless you point `RIKROK_LLM_URL` or `RIKROK_TTS_URL` at a remote server. The reels themselves contain session content (file names, commit lines, what you asked for), so share them the way you would share a terminal recording.
+With "Claude writes it", the condensed evidence (about a page: your last prompts, the assistant's notes, file names, commands, git log) goes to Claude through your own Claude Code login, the same place the session itself already went. With a local model, nothing leaves the machine. Either way the voice clip, the narration and the render stay local unless you point `RIKROK_TTS_URL` at a remote server. The reels themselves contain session content (file names, commit lines, what you asked for), so share them the way you would share a terminal recording.
 
 ## Requirements
 

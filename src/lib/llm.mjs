@@ -1,6 +1,7 @@
 // Script generation through any OpenAI-compatible chat endpoint (Ollama, LM Studio, oMLX, ...).
 // Strict JSON out; one retry; deterministic fallback so a reel ALWAYS ships.
-import { LLM_URL, LLM_MODEL, LLM_KEY, LLM_EXTRA, authHeaders } from "./config.mjs";
+import { LLM_URL, LLM_MODEL, LLM_KEY, LLM_EXTRA, SCRIPT_BACKEND, authHeaders } from "./config.mjs";
+import { claudeChat, claudeAvailable } from "./script-claude.mjs";
 
 const SYSTEM = `You write scripts for 30-45 second vertical recap reels about finished coding sessions.
 Fixed daily-news / sports-recap grammar. Brisk, neutral news-anchor tone. No hooks, no teasing, no hype words.
@@ -65,20 +66,32 @@ export async function chat(messages, { temperature = 0.4, max_tokens = 1600, tim
   return stripThinking(j.choices?.[0]?.message?.content || "");
 }
 
+let resolvedBackend = null;
+// "claude" | "local" | "none", decided once per process.
+export async function scriptBackend() {
+  if (resolvedBackend) return resolvedBackend;
+  if (SCRIPT_BACKEND === "claude") resolvedBackend = "claude";
+  else if (SCRIPT_BACKEND === "local") resolvedBackend = LLM_MODEL ? "local" : "none";
+  else resolvedBackend = LLM_MODEL ? "local" : (await claudeAvailable()) ? "claude" : "none";
+  return resolvedBackend;
+}
+
 let warnedNoModel = false;
 export async function generateScript(evidence, projectName) {
-  if (!LLM_MODEL) {
-    if (!warnedNoModel) console.error("[llm] RIKROK_LLM_MODEL not set: reels use the template script (run `rikrok doctor`)");
+  const backend = await scriptBackend();
+  if (backend === "none") {
+    if (!warnedNoModel) console.error("[llm] no script writer: set RIKROK_LLM_MODEL for a local model, or install Claude Code for RIKROK_SCRIPT=claude. Reels use the template script.");
     warnedNoModel = true;
     return { script: fallbackScript(evidence, projectName), source: "fallback" };
   }
   const user = `Project: ${projectName}\nSession evidence (JSON):\n${JSON.stringify(evidence, null, 1)}\n\nWrite the reel script JSON now.`;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const text = await chat([{ role: "system", content: SYSTEM }, { role: "user", content: user }], { temperature: attempt === 0 ? 0.4 : 0.1 });
+      const messages = [{ role: "system", content: SYSTEM }, { role: "user", content: user }];
+      const text = backend === "claude" ? await claudeChat(messages) : await chat(messages, { temperature: attempt === 0 ? 0.4 : 0.1 });
       const script = extractJson(text);
       const valid = validateScript(script);
-      if (valid.ok) return { script: normalise(script, projectName), source: "llm" };
+      if (valid.ok) return { script: normalise(script, projectName), source: backend === "claude" ? "claude" : "llm" };
       console.error(`[llm] attempt ${attempt + 1} invalid: ${valid.error}`);
     } catch (err) {
       console.error(`[llm] attempt ${attempt + 1} failed: ${err.message}`);

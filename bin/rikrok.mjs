@@ -10,6 +10,8 @@ const COMMANDS = {
   setup: "Guided setup: local LLM, your voice, first reel, feed",
   voice: "Your own voice: setup (record a clip) | test | devices | serve (local cloning server)",
   watch: "Run the watcher: recap sessions as they go idle (foreground)",
+  hook: "Claude Code SessionEnd hook: install | uninstall (recap when you leave a session)",
+  recap: "Recap one transcript now (--transcript path)",
   feed: "Serve the swipe feed",
   backfill: "Recap the most recent qualifying sessions now (--limit N)",
   doctor: "Check node, ffmpeg, sessions, LLM, voice, browser, port",

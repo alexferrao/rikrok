@@ -38,6 +38,12 @@ export const COMMENT_HOOK = env("RIKROK_COMMENT_HOOK", "");
 export const HANDLE = env("RIKROK_HANDLE", "");
 export const FLOW_BEAT = env("RIKROK_FLOW", "on") !== "off";
 
+// Who writes the script: "claude" (headless `claude -p`, your subscription), "local" (an
+// OpenAI-compatible server), or "auto" (claude when no local model is configured and the CLI exists)
+export const SCRIPT_BACKEND = env("RIKROK_SCRIPT", "auto");
+export const CLAUDE_BIN = env("RIKROK_CLAUDE_BIN", "claude");
+export const CLAUDE_MODEL = env("RIKROK_CLAUDE_MODEL", "sonnet");
+
 // Script LLM: any OpenAI-compatible chat endpoint (Ollama, LM Studio, oMLX, ...)
 export const LLM_URL = base(env("RIKROK_LLM_URL", "http://127.0.0.1:11434"));
 export const LLM_MODEL = env("RIKROK_LLM_MODEL", "");

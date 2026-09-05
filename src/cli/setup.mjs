@@ -43,8 +43,22 @@ export async function run(args) {
   try {
     console.log(`\nRik Rok setup. Everything stays on this machine. Ctrl-C any time.\n`);
 
-    // 1. LLM
-    const candidates = [
+    // 1. Who writes the script
+    const claudeHere = has("claude");
+    let useClaude = false;
+    if (claudeHere) {
+      console.log("Scripts. Rik Rok can ask Claude Code to write each recap (your subscription, no local model),\nor use a local model server (Ollama, LM Studio, oMLX).");
+      useClaude = await yes("Use Claude Code to write the recaps? (easiest)");
+    }
+    if (useClaude) {
+      cfg.RIKROK_SCRIPT = "claude";
+      saveConfig(cfg);
+      if (await yes("Recap a session automatically when you leave it? (adds a SessionEnd hook to ~/.claude/settings.json)")) {
+        const { install } = await import("./hook.mjs");
+        install();
+      }
+    }
+    const candidates = useClaude ? [] : [
       ["Ollama", "http://127.0.0.1:11434"],
       ["LM Studio", "http://127.0.0.1:1234"],
       ["oMLX", "http://127.0.0.1:8800"],
@@ -61,7 +75,7 @@ export async function run(args) {
         break;
       }
     }
-    if (!llmUrl) {
+    if (!llmUrl && !useClaude) {
       console.log("No local LLM server found (looked for Ollama, LM Studio, oMLX).");
       if (process.platform === "darwin" && has("brew") && (await yes("Install Ollama with Homebrew and start it?"))) {
         execFileSync("brew", ["install", "ollama"], { stdio: "inherit" });
@@ -104,15 +118,19 @@ export async function run(args) {
         if (stt) cfg.RIKROK_STT_MODEL = stt;
         else delete cfg.RIKROK_STT_URL;
       }
-    } else {
+    } else if (!useClaude) {
       console.log("Skipping the LLM for now: reels will use the template script until you set RIKROK_LLM_MODEL.");
     }
+    if (!useClaude) cfg.RIKROK_SCRIPT = "local";
     saveConfig(cfg);
 
     // 2. Voice
     console.log("\nVoice. Reels can be narrated in your own voice from a 20-second recording.");
     if (await yes("Record your voice now?")) {
       await voiceSetup({}, rl);
+      if (!cfg.RIKROK_TTS_URL && (await yes("No cloning server yet. Install a local one now? (rikrok voice serve, about 4.5 GB download)"))) {
+        console.log("Run `rikrok voice serve` in another terminal and leave it running; `rikrok install` keeps it running at login.");
+      }
     } else if (process.platform === "darwin") {
       saveConfig({ RIKROK_VOICE: "say:Samantha" });
       console.log("Using the built-in macOS voice for now. `rikrok voice setup` whenever you like.");

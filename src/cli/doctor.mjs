@@ -6,7 +6,8 @@ import { execFileSync } from "node:child_process";
 import * as c from "../lib/config.mjs";
 import { sources } from "../sources/index.mjs";
 import { loadVoice } from "../voices/index.mjs";
-import { chat, stripThinking, extractJson } from "../lib/llm.mjs";
+import { chat, stripThinking, extractJson, scriptBackend } from "../lib/llm.mjs";
+import { claudeChat } from "../lib/script-claude.mjs";
 import { sttEnabled, transcribeWords } from "../lib/stt.mjs";
 
 const ok = (label, detail = "") => console.log(`  ok    ${label}${detail ? `  (${detail})` : ""}`);
@@ -86,8 +87,20 @@ export async function run(args) {
     } else warn(`no ${src.id} sessions found`);
   }
 
-  if (!c.LLM_MODEL) {
-    warn("RIKROK_LLM_MODEL not set: scripts fall back to the plain template", "set RIKROK_LLM_URL (default Ollama at :11434) and RIKROK_LLM_MODEL, e.g. qwen3:8b");
+  const backend = await scriptBackend();
+  if (backend === "claude") {
+    const t0 = Date.now();
+    try {
+      const text = await claudeChat([{ role: "user", content: 'Reply with exactly this JSON and nothing else: {"ok":true}' }], { timeoutMs: 90_000 });
+      const j = extractJson(text);
+      if (j && j.ok === true) ok(`scripts by Claude Code (${c.CLAUDE_MODEL})`, `${Date.now() - t0} ms`);
+      else warn(`Claude Code answered but not with clean JSON: ${JSON.stringify(text).slice(0, 80)}`);
+    } catch (err) {
+      fail(`scripts by Claude Code: ${err.message}`, "is `claude` installed and logged in? Or set RIKROK_SCRIPT=local with a local model");
+      failures++;
+    }
+  } else if (backend === "none") {
+    warn("no script writer: reels fall back to the plain template", "install Claude Code (RIKROK_SCRIPT=claude) or set RIKROK_LLM_URL and RIKROK_LLM_MODEL for a local model");
   } else {
     const t0 = Date.now();
     try {

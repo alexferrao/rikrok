@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Claude writes it: `RIKROK_SCRIPT=claude` (the default when no local model is set and the CLI is installed) asks Claude Code headlessly to write each recap on your subscription. No local model needed.
+- `rikrok hook install`: a Claude Code SessionEnd hook that builds the reel in the background when you leave a session with real work in it. `rikrok recap --transcript` is what it runs.
+- `rikrok setup` now starts with "Claude or local?" and offers the hook.
+- README reorganised around the three ways to run it.
+
 ## 0.4.0
 
 - `rikrok voice serve`: installs and runs a local Qwen3-TTS cloning server (MLX on Apple Silicon, PyTorch elsewhere) in its own uv environment and points Rik Rok at it. `--fast` for the 0.6B model. `rikrok install` adds it as a login agent when in use. New and lightly tested: please report what breaks.
