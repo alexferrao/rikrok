@@ -139,6 +139,8 @@ Environment variables, or the same keys in `~/.rikrok/config.json`. `rikrok conf
 | `RIKROK_FLOW` | `on` | `off` drops the "how it moves" beat |
 | `RIKROK_VOICE` | `say:Samantha` on macOS, else `none` | `clone` (your voice), `say:<Voice>`, `openai-speech:<voice>`, `module:<path>`, `none` |
 | `RIKROK_CLONE_REF` / `_TEXT` / `_MODEL` | `~/.rikrok/voice/ref.wav`, `ref.txt`, `Qwen3-TTS-12Hz-1.7B-Base-bf16` | Reference clip, its transcript, and the cloning model on your speech server |
+| `RIKROK_CLONE_API` | `speech` | `voice-clone` for servers with a dedicated `/v1/audio/voice-clone` endpoint (set by `rikrok voice serve`) |
+| `RIKROK_VOICE_PORT` | `4873` | Port for `rikrok voice serve` |
 | `RIKROK_TTS_URL` / `_MODEL` / `_KEY` | LLM URL, `tts-1` | For `openai-speech`: any `/v1/audio/speech` server (Kokoro-FastAPI, oMLX Qwen3-TTS, LM Studio) |
 | `RIKROK_VOICE_FX` | `none` | `light` or `strong` robot treatment |
 | `RIKROK_STT_URL` / `_MODEL` / `_KEY` | unset | Enable transcribe-back QA via a `/v1/audio/transcriptions` server with word timestamps |
@@ -158,7 +160,18 @@ rikrok voice setup --file me.wav --text "what I say in it"   # or bring a clip y
 rikrok voice test            # say a line in your voice
 ```
 
-There is no training. The clip and its transcript are stored in `~/.rikrok/voice` and sent with every request to a local speech server that does zero-shot cloning. Today that means a server that accepts `ref_audio` and `ref_text` on `/v1/audio/speech`, such as oMLX with Qwen3-TTS (`RIKROK_CLONE_MODEL` names the model). More servers are coming, and `rikrok voice serve` (a bundled local cloning server) is next on the roadmap. Nothing is uploaded anywhere.
+There is no training. The clip and its transcript are stored in `~/.rikrok/voice` and sent with every request to a local speech server that does zero-shot cloning. Nothing is uploaded anywhere.
+
+You need a speech server that can clone. The easy way:
+
+```bash
+rikrok voice serve           # installs and runs a local Qwen3-TTS server on :4873 (MLX on Apple Silicon)
+rikrok voice serve --fast    # the 0.6B model: smaller download, quicker, a little less like you
+```
+
+New in 0.4.0 and lightly tested so far; please open an issue with what breaks. It needs [uv](https://docs.astral.sh/uv/) and git, downloads the model from Hugging Face on first start (about 4.5 GB, or 1.5 GB for `--fast`), and points Rik Rok at itself. `rikrok install` keeps it running at login alongside the watcher and the feed. The server is the Apache-2.0 [Qwen3-TTS OpenAI FastAPI project](https://github.com/groxaxo/Qwen3-TTS-Openai-Fastapi); on Linux and Windows it runs on PyTorch (CPU unless you set `TTS_DEVICE=cuda`).
+
+Already running something that clones? Any server that takes `ref_audio` and `ref_text` on `/v1/audio/speech` (oMLX with Qwen3-TTS, for example) works with `RIKROK_TTS_URL` and `RIKROK_CLONE_MODEL`; set `RIKROK_CLONE_API=voice-clone` for servers that use the dedicated `/v1/audio/voice-clone` endpoint instead.
 
 ### Other voices
 
@@ -203,7 +216,6 @@ Linux: the watcher and feed run fine (`rikrok watch`, `rikrok feed`); `rikrok in
 
 ## Roadmap
 
-- `rikrok voice serve`: a bundled local cloning server (mlx-audio on Apple Silicon, Chatterbox or F5-TTS elsewhere) so your own voice needs no other setup.
 - Codex CLI sessions (`~/.codex/sessions`) as a second source. The source interface is already in place.
 - Gemini CLI, OpenCode, Cursor.
 - A screenshot of the running app as a play's visual when the session mentioned a live URL.

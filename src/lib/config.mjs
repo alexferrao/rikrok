@@ -62,6 +62,11 @@ export const VOICE_DIR = path.join(RIKROK_HOME, "voice");
 export const CLONE_REF = path.resolve(expandHome(env("RIKROK_CLONE_REF", path.join(VOICE_DIR, "ref.wav"))));
 export const CLONE_TEXT = path.resolve(expandHome(env("RIKROK_CLONE_TEXT", path.join(VOICE_DIR, "ref.txt"))));
 export const CLONE_MODEL = env("RIKROK_CLONE_MODEL", "Qwen3-TTS-12Hz-1.7B-Base-bf16");
+// How the speech server takes the reference clip: "speech" = ref_audio on /v1/audio/speech (oMLX),
+// "voice-clone" = the dedicated /v1/audio/voice-clone endpoint (the server `rikrok voice serve` runs)
+export const CLONE_API = env("RIKROK_CLONE_API", "speech");
+export const VOICE_SERVER_DIR = path.join(RIKROK_HOME, "voice-server");
+export const VOICE_SERVER_PORT = num("RIKROK_VOICE_PORT", 4873);
 
 // Optional transcribe-back QA of narration (off unless RIKROK_STT_URL is set)
 export const STT_URL = env("RIKROK_STT_URL", "") ? base(env("RIKROK_STT_URL")) : "";

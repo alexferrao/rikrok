@@ -3,7 +3,7 @@
 // today; any server that accepts ref_audio / ref_text on /v1/audio/speech).
 // Set up with `rikrok voice setup`. Nothing is trained and nothing leaves the machine.
 import fs from "node:fs";
-import { TTS_URL, TTS_KEY, CLONE_MODEL, CLONE_REF, CLONE_TEXT, authHeaders } from "../lib/config.mjs";
+import { TTS_URL, TTS_KEY, CLONE_MODEL, CLONE_REF, CLONE_TEXT, CLONE_API, authHeaders } from "../lib/config.mjs";
 
 export function cloneVoice() {
   const refText = () => {
@@ -28,6 +28,18 @@ export function cloneVoice() {
     },
     async synth(text, outPath) {
       try {
+        if (CLONE_API === "voice-clone") {
+          // Qwen3-TTS OpenAI FastAPI server (what `rikrok voice serve` runs): dedicated endpoint.
+          const r = await fetch(`${TTS_URL}/v1/audio/voice-clone`, {
+            method: "POST",
+            headers: { ...authHeaders(TTS_KEY), "Content-Type": "application/json" },
+            body: JSON.stringify({ input: text, ref_audio: fs.readFileSync(CLONE_REF).toString("base64"), ref_text: refText(), x_vector_only_mode: false, language: "English", response_format: "wav", speed: 1.0 }),
+            signal: AbortSignal.timeout(300_000),
+          });
+          if (!r.ok) return { ok: false, error: `HTTP ${r.status}: ${(await r.text()).slice(0, 200)}` };
+          fs.writeFileSync(outPath, Buffer.from(await r.arrayBuffer()));
+          return { ok: true };
+        }
         const body = {
           model: CLONE_MODEL,
           input: text,

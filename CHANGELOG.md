@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- `rikrok voice serve`: installs and runs a local Qwen3-TTS cloning server (MLX on Apple Silicon, PyTorch elsewhere) in its own uv environment and points Rik Rok at it. `--fast` for the 0.6B model. `rikrok install` adds it as a login agent when in use. New and lightly tested: please report what breaks.
+- `RIKROK_CLONE_API=voice-clone` for servers with a dedicated clone endpoint.
+
 ## 0.3.0
 
 - Your own voice: `rikrok voice setup` records a 22-second clip (or takes one you have), stores it with its transcript, and switches narration to `clone`. Zero-shot, no training, nothing uploaded. Works with any speech server that accepts a reference clip on `/v1/audio/speech` (oMLX with Qwen3-TTS today).

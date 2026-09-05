@@ -8,7 +8,7 @@ if (major < 20 || (major === 20 && minor < 19)) {
 
 const COMMANDS = {
   setup: "Guided setup: local LLM, your voice, first reel, feed",
-  voice: "Your own voice: setup (record a clip) | test | devices",
+  voice: "Your own voice: setup (record a clip) | test | devices | serve (local cloning server)",
   watch: "Run the watcher: recap sessions as they go idle (foreground)",
   feed: "Serve the swipe feed",
   backfill: "Recap the most recent qualifying sessions now (--limit N)",

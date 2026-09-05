@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import { PKG_ROOT, BIN, LOG_DIR, RIKROK_HOME, ensureDirs, effectiveEnv } from "../lib/config.mjs";
 
 const AGENTS = { watch: "com.rikrok.watch", feed: "com.rikrok.feed" };
+const VOICE_AGENT = "com.rikrok.voice";
 const dir = path.join(os.homedir(), "Library", "LaunchAgents");
 const uid = process.getuid?.() ?? 501;
 
@@ -28,7 +29,7 @@ export async function run(args) {
     return 0;
   }
   if (args.uninstall) {
-    for (const label of Object.values(AGENTS)) {
+    for (const label of [...Object.values(AGENTS), VOICE_AGENT]) {
       bootout(label);
       fs.rmSync(path.join(dir, `${label}.plist`), { force: true });
       console.log(`removed ${label}`);
@@ -41,15 +42,17 @@ export async function run(args) {
   const envVars = { RIKROK_HOME, ...effectiveEnv() };
   const envXml = Object.entries(envVars).map(([k, v]) => `    <key>${esc(k)}</key><string>${esc(v)}</string>`).join("\n");
   const PATH = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin", path.dirname(process.execPath)].filter((p, i, a) => a.indexOf(p) === i).join(":");
-  for (const [cmd, label] of Object.entries(AGENTS)) {
+  const agents = { ...AGENTS };
+  if (process.env.RIKROK_CLONE_API === "voice-clone") agents["voice serve"] = VOICE_AGENT;
+  for (const [cmd, label] of Object.entries(agents)) {
     const plist = tmpl
       .replaceAll("{{LABEL}}", label)
       .replaceAll("{{NODE}}", esc(process.execPath))
       .replaceAll("{{BIN}}", esc(BIN))
-      .replaceAll("{{CMD}}", cmd)
+      .replaceAll("<string>{{CMD}}</string>", cmd.split(" ").map((c) => `<string>${c}</string>`).join("\n    "))
       .replaceAll("{{WORKDIR}}", esc(PKG_ROOT))
-      .replaceAll("{{LOG}}", esc(path.join(LOG_DIR, `${cmd}.log`)))
-      .replaceAll("{{ERRLOG}}", esc(path.join(LOG_DIR, `${cmd}.err.log`)))
+      .replaceAll("{{LOG}}", esc(path.join(LOG_DIR, `${cmd.replace(" ", "-")}.log`)))
+      .replaceAll("{{ERRLOG}}", esc(path.join(LOG_DIR, `${cmd.replace(" ", "-")}.err.log`)))
       .replaceAll("{{PATH}}", esc(PATH))
       .replaceAll("{{ENV}}", envXml);
     const file = path.join(dir, `${label}.plist`);

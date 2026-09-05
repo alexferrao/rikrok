@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline/promises";
 import { execFileSync, spawnSync } from "node:child_process";
-import { RIKROK_HOME, VOICE_DIR, CLONE_REF, CLONE_TEXT, CONFIG_FILE, TTS_URL, ensureDirs } from "../lib/config.mjs";
+import { RIKROK_HOME, VOICE_DIR, CLONE_REF, CLONE_TEXT, CONFIG_FILE, TTS_URL, VOICE_SERVER_DIR, VOICE_SERVER_PORT, ensureDirs } from "../lib/config.mjs";
 import { cloneVoice } from "../voices/clone.mjs";
 
 // Short, neutral, covers most English sounds, easy to read in one breath per line.
@@ -120,6 +120,65 @@ export async function setup(args, rl) {
   }
 }
 
+
+// ---- rikrok voice serve: a local cloning server, installed on first use ----
+// Runs the Qwen3-TTS OpenAI-compatible FastAPI server (Apache-2.0) in its own uv-managed
+// Python environment under ~/.rikrok/voice-server. MLX on Apple Silicon, PyTorch elsewhere.
+// The model (about 4.5 GB for the 1.7B Base) downloads from Hugging Face on first start.
+const SERVER_REPO = "https://github.com/groxaxo/Qwen3-TTS-Openai-Fastapi.git";
+const APPLE = process.platform === "darwin" && process.arch === "arm64";
+const MODELS = {
+  mlx: { full: "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16", fast: "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16" },
+  torch: { full: "Qwen/Qwen3-TTS-12Hz-1.7B-Base", fast: "Qwen/Qwen3-TTS-12Hz-0.6B-Base" },
+};
+const srcDir = () => path.join(VOICE_SERVER_DIR, "src");
+const venvPy = () => path.join(srcDir(), ".venv", "bin", process.platform === "win32" ? "python.exe" : "python");
+
+function haveUv() {
+  return spawnSync("uv", ["--version"], { stdio: "ignore" }).status === 0;
+}
+
+export function installServer({ log = console.log } = {}) {
+  if (!haveUv()) {
+    log("This needs uv (the Python tool manager). Install it with:\n  curl -LsSf https://astral.sh/uv/install.sh | sh\nthen run `rikrok voice serve` again.");
+    return false;
+  }
+  fs.mkdirSync(VOICE_SERVER_DIR, { recursive: true });
+  if (!fs.existsSync(path.join(srcDir(), "pyproject.toml"))) {
+    log(`Fetching the speech server into ${srcDir()} ...`);
+    execFileSync("git", ["clone", "--depth", "1", SERVER_REPO, srcDir()], { stdio: "inherit" });
+  }
+  if (!fs.existsSync(venvPy())) {
+    log("Creating its Python environment (uv, Python 3.12) ...");
+    execFileSync("uv", ["venv", "--python", "3.12", path.join(srcDir(), ".venv")], { stdio: "inherit", cwd: srcDir() });
+    const extras = APPLE ? ".[api,mlx]" : ".[api]";
+    log(`Installing the server${APPLE ? " with MLX" : ""} (a few minutes the first time) ...`);
+    execFileSync("uv", ["pip", "install", "--python", venvPy(), "-e", extras], { stdio: "inherit", cwd: srcDir() });
+  }
+  return true;
+}
+
+export async function serve(args) {
+  if (!installServer()) return 1;
+  const fast = Boolean(args.fast);
+  const backend = APPLE ? "mlx" : "pytorch";
+  const model = APPLE ? MODELS.mlx[fast ? "fast" : "full"] : MODELS.torch[fast ? "fast" : "full"];
+  const port = Number(args.port || VOICE_SERVER_PORT);
+  const lib = path.join(VOICE_DIR, "library");
+  fs.mkdirSync(lib, { recursive: true });
+  const env = { ...process.env, PORT: String(port), HOST: "127.0.0.1", TTS_BACKEND: backend, VOICE_LIBRARY_DIR: lib };
+  if (APPLE) env.MLX_MODEL_ID = model;
+  else {
+    env.TTS_MODEL_NAME = model;
+    if (!process.env.TTS_DEVICE) env.TTS_DEVICE = "cpu";
+  }
+  // Point Rik Rok at it, and at the dedicated clone endpoint.
+  saveConfig({ RIKROK_TTS_URL: `http://127.0.0.1:${port}`, RIKROK_CLONE_API: "voice-clone", RIKROK_VOICE: "clone" });
+  console.log(`Speech server: ${backend} backend, model ${model}, http://127.0.0.1:${port}\nFirst start downloads the model from Hugging Face (about ${fast ? "1.5" : "4.5"} GB). Ctrl-C to stop.\n`);
+  const child = spawnSync(venvPy(), ["-m", "api.main"], { cwd: srcDir(), env, stdio: "inherit" });
+  return child.status ?? 0;
+}
+
 export async function test() {
   const v = cloneVoice();
   const a = await v.available();
@@ -139,15 +198,17 @@ export async function test() {
 }
 
 export async function run(args) {
-  const sub = args._[0] || "setup";
+  const sub = args._[0] || "help";
   if (sub === "setup") return setup(args);
   if (sub === "test") return test();
+  if (sub === "serve") return serve(args);
+  if (sub === "install-server") return installServer() ? 0 : 1;
   if (sub === "devices") {
     const d = listDevices();
     if (!d.length) console.log(process.platform === "darwin" ? "no input devices found" : "device listing is macOS only; recording uses the default pulse input");
     d.forEach((x) => console.log(`${x.index}  ${x.name}`));
     return 0;
   }
-  console.log("usage: rikrok voice setup [--file clip.wav --text \"what is said\"] [--device N] [--seconds 22] | test | devices");
+  console.log("usage: rikrok voice setup [--file clip.wav --text \"what is said\"] [--device N] [--seconds 22] | test | devices | serve [--fast] [--port N] | install-server");
   return 1;
 }
