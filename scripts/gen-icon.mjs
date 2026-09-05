@@ -57,25 +57,38 @@ export function mark({ size = 512, fill = 0.8, pad = 96, bg = true, id = "m" } =
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${defs(id)}${bg ? `<rect width="${size}" height="${size}" rx="${pad}" fill="#000"/>` : ""}<g transform="${fit}"><g style="mix-blend-mode:screen" transform="translate(${(-off / f).toFixed(3)} ${(-off * 0.7 / f).toFixed(3)})">${body(CY, id)}</g><g style="mix-blend-mode:screen" transform="translate(${(off / f).toFixed(3)} ${(off * 0.7 / f).toFixed(3)})">${body(RD, id)}</g>${body("#fff", id)}</g></svg>`;
 }
 
-const bric = fs.readFileSync(path.join(root, "node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2")).toString("base64");
-// Wordmark: "Rik Rok" where both capitals are the mark itself. The mark's R (no background)
-// is scaled so its cap height matches Bricolage's, then "ik" and "ok" follow in Bricolage.
-const FS = 112; // Bricolage size
-const capPx = FS * 0.72; // Bricolage cap height, roughly
-const T = 144, FILLW = 0.86; // the mark tile used inside the wordmark
-const fT = Math.min((T * FILLW) / w, (T * FILLW) / h); // the mark's fit factor on that tile
-const markScale = capPx / (capH * fT); // so the R's cap height matches Bricolage's
-const visW = w * fT * markScale, visH = h * fT * markScale; // the mark's visible size after scaling
-const insetX = ((T - w * fT) / 2) * markScale, insetY = ((T - h * fT) / 2) * markScale; // where the ink starts inside the tile
-const baselineY = 118;
-const piece = (x, id) => `<g transform="translate(${(x - insetX).toFixed(2)} ${(baselineY - insetY - visH).toFixed(2)}) scale(${markScale.toFixed(4)})">${mark({ size: T, fill: FILLW, bg: false, id }).replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "")}</g>`;
-const txt = (t, x, color, dx, dy) => `<text x="${x + dx}" y="${baselineY + dy}" font-family="RikRokDisplay,'Bricolage Grotesque','Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="${FS}" letter-spacing="-3" fill="${color}"${color === "#fff" ? "" : ' style="mix-blend-mode:screen"'}>${t}</text>`;
-const trioTxt = (t, x) => txt(t, x, CY, -5, -3.5) + txt(t, x, RD, 5, 3.5) + txt(t, x, "#fff", 0, 0);
-// layout: [R]ik  [R]ok, with real widths
-const ikW = FS * 1.02, okW = FS * 1.16, gapAfterMark = 12, wordGap = 52;
-const r1 = 24, ikX = r1 + visW + gapAfterMark, r2 = ikX + ikW + wordGap, okX = r2 + visW + gapAfterMark;
-const totalW = Math.round(okX + okW + 24);
-const wordmark = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} 160" width="${totalW}" height="160"><style>@font-face{font-family:'RikRokDisplay';src:url(data:font/woff2;base64,${bric}) format('woff2');font-weight:200 800}</style><rect width="${totalW}" height="160" rx="24" fill="#000"/>${piece(r1, "w1")}${trioTxt("ik", ikX)}${piece(r2, "w2")}${trioTxt("ok", okX)}</svg>`;
+// Wordmark: "Rik Rok" set entirely in Baskerville Bold Italic outlines, where each R is the
+// mark (rest + R). Letters are advanced by the font's own widths in the mark's coordinate
+// system (font-size 300 at x=200, baseline 450), then the whole line is fitted.
+const upem = bask.unitsPerEm, u = SIZE / upem;
+const adv = (ch) => bask.glyphForCodePoint(ch.codePointAt(0)).advanceWidth * u;
+const glyphPath = (ch) => bask.glyphForCodePoint(ch.codePointAt(0)).path.toSVG();
+const KERN = -0.02 * SIZE; // a touch tighter than the font's default fit
+const letters = [];
+let x = 0;
+for (const ch of "Rik Rok") {
+  letters.push({ ch, x });
+  x += (ch === " " ? adv(" ") * 1.15 : adv(ch)) + (ch === " " ? 0 : KERN);
+}
+const lineW = x - KERN;
+const lineBody = (fill, id) =>
+  letters
+    .map(({ ch, x }, i) => {
+      if (ch === " ") return "";
+      if (ch === "R") return `<g transform="translate(${x.toFixed(2)} 0)">${body(fill, `${id}${i}`)}</g>`;
+      return `<path transform="translate(${x.toFixed(2)} 0) ${glyphT(bask)}" fill="${fill}" d="${glyphPath(ch)}"/>`;
+    })
+    .join("");
+const lineDefs = () => ["wc", "wr", "ww"].map((id) => letters.map((l, i) => (l.ch === "R" ? defs(`${id}${i}`) : "")).join("")).join("");
+// bounds of the line: from the first mark's left ink to the last k's right edge; height = mark's box
+const lx0 = ux0, lx1 = letters[letters.length - 1].x + adv("k") + X, ly0 = uy0, ly1 = uy1;
+const LW = lx1 - lx0, LH = ly1 - ly0;
+const WM_H = 160, WM_PAD = 28;
+const fw = (WM_H - WM_PAD * 2) / LH;
+const WM_W = Math.round(LW * fw + WM_PAD * 2);
+const wfit = `translate(${WM_PAD} ${WM_PAD}) scale(${fw.toFixed(5)}) translate(${-lx0} ${-ly0})`;
+const woff = 5 / fw;
+const wordmark = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WM_W} ${WM_H}" width="${WM_W}" height="${WM_H}">${lineDefs()}<rect width="${WM_W}" height="${WM_H}" rx="24" fill="#000"/><g transform="${wfit}"><g style="mix-blend-mode:screen" transform="translate(${-woff} ${-woff * 0.7})">${lineBody(CY, "wc")}</g><g style="mix-blend-mode:screen" transform="translate(${woff} ${woff * 0.7})">${lineBody(RD, "wr")}</g>${lineBody("#fff", "ww")}</g></svg>`;
 
 fs.mkdirSync(path.join(root, "assets"), { recursive: true });
 fs.writeFileSync(path.join(root, "assets", "icon.svg"), mark());
