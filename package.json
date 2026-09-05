@@ -48,7 +48,7 @@
     "demo": "node bin/rikrok.mjs demo",
     "studio": "remotion studio remotion/index.ts",
     "gen-icon": "node scripts/gen-icon.mjs",
-    "test": "node --test \"test/*.test.mjs\""
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.2.5",
