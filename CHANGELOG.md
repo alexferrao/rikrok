@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Your own voice: `rikrok voice setup` records a 22-second clip (or takes one you have), stores it with its transcript, and switches narration to `clone`. Zero-shot, no training, nothing uploaded. Works with any speech server that accepts a reference clip on `/v1/audio/speech` (oMLX with Qwen3-TTS today).
+- `rikrok setup`: guided path for first run. Finds Ollama, LM Studio or oMLX (or installs Ollama), picks a model, records your voice, renders the demo, offers the login install.
+- `rikrok voice test` and `rikrok voice devices`.
+
 ## 0.2.0
 
 - "How it moves" beat: when a session built or changed a flow (a tap reaching an API, data written somewhere, a job firing), the script returns nodes and edges and the reel animates them. `RIKROK_FLOW=off` to drop it.

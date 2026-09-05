@@ -1,4 +1,5 @@
 // Voice backends. Spec strings (RIKROK_VOICE):
+//   clone                   your own voice from a reference clip (rikrok voice setup)
 //   say:<Voice>             macOS `say` (default on a Mac)
 //   openai-speech:<voice>   any OpenAI-compatible /v1/audio/speech server
 //   module:<path>           your own module (private voice clones live here)
@@ -8,11 +9,13 @@ import { saySpeech } from "./say.mjs";
 import { openaiSpeech } from "./openai-speech.mjs";
 import { moduleVoice } from "./module.mjs";
 import { silentVoice } from "./none.mjs";
+import { cloneVoice } from "./clone.mjs";
 
-export const VOICE_SPECS = ["say:<Voice>", "openai-speech:<voice>", "module:<path>", "none"];
+export const VOICE_SPECS = ["clone", "say:<Voice>", "openai-speech:<voice>", "module:<path>", "none"];
 
 export async function loadVoice(spec = VOICE) {
   if (spec === "none") return silentVoice();
+  if (spec === "clone") return cloneVoice();
   if (spec === "say") return saySpeech();
   if (spec.startsWith("say:")) return saySpeech(spec.slice(4));
   if (spec === "openai-speech") return openaiSpeech();

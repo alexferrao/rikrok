@@ -1,6 +1,6 @@
 {
   "name": "rikrok",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Your Claude Code sessions, recapped as short vertical reels you doomscroll on your phone. Local-first.",
   "type": "module",
   "license": "MIT",

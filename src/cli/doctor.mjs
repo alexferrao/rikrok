@@ -108,7 +108,7 @@ export async function run(args) {
     const a = await v.available();
     if (a.ok) ok(`voice ${v.name}`);
     else {
-      warn(`voice ${c.VOICE} unavailable: ${a.reason}`, process.platform === "darwin" ? "falls back to say:Samantha, then silent captions" : "falls back to silent captions (set RIKROK_VOICE=openai-speech:<voice> with RIKROK_TTS_URL for a local TTS server)");
+      warn(`voice ${c.VOICE} unavailable: ${a.reason}`, c.VOICE === "clone" ? "run `rikrok voice setup`, and point RIKROK_TTS_URL at a server that accepts a reference clip" : process.platform === "darwin" ? "falls back to say:Samantha, then silent captions" : "falls back to silent captions (rikrok voice setup for your own voice, or RIKROK_VOICE=openai-speech:<voice>)");
     }
   } catch (err) {
     warn(`voice ${c.VOICE}: ${err.message}`);

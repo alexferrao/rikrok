@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { CONFIG_FILE, expandHome } from "./paths.mjs";
+import { CONFIG_FILE, RIKROK_HOME, expandHome } from "./paths.mjs";
 export * from "./paths.mjs";
 
 // config.json keys (RIKROK_*) fill in anything the environment did not set.
@@ -57,6 +57,11 @@ export const VOICE_FX = env("RIKROK_VOICE_FX", "none");
 export const TTS_URL = base(env("RIKROK_TTS_URL", LLM_URL));
 export const TTS_MODEL = env("RIKROK_TTS_MODEL", "tts-1");
 export const TTS_KEY = env("RIKROK_TTS_KEY", LLM_KEY);
+// Own voice (RIKROK_VOICE=clone): reference clip + transcript, recorded by `rikrok voice setup`
+export const VOICE_DIR = path.join(RIKROK_HOME, "voice");
+export const CLONE_REF = path.resolve(expandHome(env("RIKROK_CLONE_REF", path.join(VOICE_DIR, "ref.wav"))));
+export const CLONE_TEXT = path.resolve(expandHome(env("RIKROK_CLONE_TEXT", path.join(VOICE_DIR, "ref.txt"))));
+export const CLONE_MODEL = env("RIKROK_CLONE_MODEL", "Qwen3-TTS-12Hz-1.7B-Base-bf16");
 
 // Optional transcribe-back QA of narration (off unless RIKROK_STT_URL is set)
 export const STT_URL = env("RIKROK_STT_URL", "") ? base(env("RIKROK_STT_URL")) : "";

@@ -8,14 +8,20 @@ Imagine if your recaps came at you the same way you doomscroll.
 
 Welcome to Rik Rok.
 
-Rik Rok watches your coding-agent sessions. When one goes idle after real work, it writes a 30 to 45 second news-style recap, narrates it, renders a vertical reel, and drops it into a swipe feed on your phone. Every reel ends with the single next step for that project, and when the session changed how something moves, the reel shows the flow. Reply to a reel and the comment can go straight back to the agent.
+Rik Rok watches your coding-agent sessions. When one goes idle after real work, it writes a 30 to 45 second news-style recap, narrates it in your own voice, renders a vertical reel, and drops it into a swipe feed on your phone. Every reel ends with the single next step for that project, and when the session changed how something moves, the reel shows the flow. Reply to a reel and the comment can go straight back to the agent.
 
-Everything runs on your machine. Sessions are read from disk, scripts come from a local LLM, narration from a local voice, rendering from Remotion. No cloud, no accounts, no telemetry.
+Everything runs on your machine. Sessions are read from disk, scripts come from a local LLM, narration from a 20-second recording of you, rendering from Remotion. No cloud, no accounts, no telemetry. Your voice never leaves the machine.
 
 ## Quickstart (macOS)
 
 ```bash
 npm install -g rikrok        # or: npx rikrok ...
+rikrok setup                 # guided: finds or installs a local LLM, records your voice, renders the first reel
+```
+
+That is the whole setup for most people. The rest of this section is the same thing by hand.
+
+```bash
 rikrok doctor                # checks ffmpeg, sessions, LLM, voice, render browser
 ```
 
@@ -131,7 +137,8 @@ Environment variables, or the same keys in `~/.rikrok/config.json`. `rikrok conf
 | `RIKROK_LLM_KEY` | unset | Bearer token if your server wants one |
 | `RIKROK_LLM_EXTRA` | `{}` | JSON merged into every chat request, e.g. `{"think":false}` (Ollama) or `{"chat_template_kwargs":{"enable_thinking":false}}` (oMLX, vLLM) |
 | `RIKROK_FLOW` | `on` | `off` drops the "how it moves" beat |
-| `RIKROK_VOICE` | `say:Samantha` on macOS, else `none` | `say:<Voice>`, `openai-speech:<voice>`, `module:<path>`, `none` |
+| `RIKROK_VOICE` | `say:Samantha` on macOS, else `none` | `clone` (your voice), `say:<Voice>`, `openai-speech:<voice>`, `module:<path>`, `none` |
+| `RIKROK_CLONE_REF` / `_TEXT` / `_MODEL` | `~/.rikrok/voice/ref.wav`, `ref.txt`, `Qwen3-TTS-12Hz-1.7B-Base-bf16` | Reference clip, its transcript, and the cloning model on your speech server |
 | `RIKROK_TTS_URL` / `_MODEL` / `_KEY` | LLM URL, `tts-1` | For `openai-speech`: any `/v1/audio/speech` server (Kokoro-FastAPI, oMLX Qwen3-TTS, LM Studio) |
 | `RIKROK_VOICE_FX` | `none` | `light` or `strong` robot treatment |
 | `RIKROK_STT_URL` / `_MODEL` / `_KEY` | unset | Enable transcribe-back QA via a `/v1/audio/transcriptions` server with word timestamps |
@@ -143,14 +150,24 @@ Environment variables, or the same keys in `~/.rikrok/config.json`. `rikrok conf
 | `RIKROK_HANDLE` | unset | Handle shown on every reel |
 | `RIKROK_BROWSER` | unset | Path to a Chrome or Chromium binary if you would rather not let Remotion download one |
 
-### Voices
+### Your own voice
 
-- `say:Samantha` (any voice from `say -v ?`): zero setup on a Mac.
+```bash
+rikrok voice setup           # reads you a two-line script, records 22 seconds, plays it back, done
+rikrok voice setup --file me.wav --text "what I say in it"   # or bring a clip you already have
+rikrok voice test            # say a line in your voice
+```
+
+There is no training. The clip and its transcript are stored in `~/.rikrok/voice` and sent with every request to a local speech server that does zero-shot cloning. Today that means a server that accepts `ref_audio` and `ref_text` on `/v1/audio/speech`, such as oMLX with Qwen3-TTS (`RIKROK_CLONE_MODEL` names the model). More servers are coming, and `rikrok voice serve` (a bundled local cloning server) is next on the roadmap. Nothing is uploaded anywhere.
+
+### Other voices
+
+- `say:Samantha` (any voice from `say -v ?`): zero setup on a Mac, the fallback while your voice is not set up.
 - `openai-speech:<voice>`: point `RIKROK_TTS_URL` at a local speech server. Kokoro-FastAPI, oMLX with Qwen3-TTS presets, and LM Studio all speak this API.
 - `module:/path/to/voice.mjs`: your own engine. Export `{ name, available(), synth(text, outWavPath) }`. This is how a private voice clone stays private.
 - `none`: silent reels, captions carry the story.
 
-If the configured voice is unavailable, Rik Rok falls back to `say`, then to silence, and says so in the sidecar.
+If the configured voice is unavailable, Rik Rok falls back to `say`, then to silence, and says so in the sidecar. The default voices are there so a reel always ships; the point is your own.
 
 ### Comment hook
 
@@ -186,6 +203,7 @@ Linux: the watcher and feed run fine (`rikrok watch`, `rikrok feed`); `rikrok in
 
 ## Roadmap
 
+- `rikrok voice serve`: a bundled local cloning server (mlx-audio on Apple Silicon, Chatterbox or F5-TTS elsewhere) so your own voice needs no other setup.
 - Codex CLI sessions (`~/.codex/sessions`) as a second source. The source interface is already in place.
 - Gemini CLI, OpenCode, Cursor.
 - A screenshot of the running app as a play's visual when the session mentioned a live URL.
