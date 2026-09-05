@@ -58,8 +58,24 @@ export function mark({ size = 512, fill = 0.8, pad = 96, bg = true, id = "m" } =
 }
 
 const bric = fs.readFileSync(path.join(root, "node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2")).toString("base64");
-const word = (color, dx, dy) => `<text x="${196 + dx}" y="${118 + dy}" font-family="RikRokDisplay,'Bricolage Grotesque','Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="104" letter-spacing="-3" fill="${color}"${color === "#fff" ? "" : ' style="mix-blend-mode:screen"'}>Rik Rok</text>`;
-const wordmark = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 160" width="640" height="160"><style>@font-face{font-family:'RikRokDisplay';src:url(data:font/woff2;base64,${bric}) format('woff2');font-weight:200 800}</style><rect width="640" height="160" rx="24" fill="#000"/><g transform="translate(16 8)">${mark({ size: 144, fill: 0.86, bg: false, id: "w" }).replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "")}</g>${word(CY, -5, -3.5)}${word(RD, 5, 3.5)}${word("#fff", 0, 0)}</svg>`;
+// Wordmark: "Rik Rok" where both capitals are the mark itself. The mark's R (no background)
+// is scaled so its cap height matches Bricolage's, then "ik" and "ok" follow in Bricolage.
+const FS = 112; // Bricolage size
+const capPx = FS * 0.72; // Bricolage cap height, roughly
+const T = 144, FILLW = 0.86; // the mark tile used inside the wordmark
+const fT = Math.min((T * FILLW) / w, (T * FILLW) / h); // the mark's fit factor on that tile
+const markScale = capPx / (capH * fT); // so the R's cap height matches Bricolage's
+const visW = w * fT * markScale, visH = h * fT * markScale; // the mark's visible size after scaling
+const insetX = ((T - w * fT) / 2) * markScale, insetY = ((T - h * fT) / 2) * markScale; // where the ink starts inside the tile
+const baselineY = 118;
+const piece = (x, id) => `<g transform="translate(${(x - insetX).toFixed(2)} ${(baselineY - insetY - visH).toFixed(2)}) scale(${markScale.toFixed(4)})">${mark({ size: T, fill: FILLW, bg: false, id }).replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "")}</g>`;
+const txt = (t, x, color, dx, dy) => `<text x="${x + dx}" y="${baselineY + dy}" font-family="RikRokDisplay,'Bricolage Grotesque','Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="${FS}" letter-spacing="-3" fill="${color}"${color === "#fff" ? "" : ' style="mix-blend-mode:screen"'}>${t}</text>`;
+const trioTxt = (t, x) => txt(t, x, CY, -5, -3.5) + txt(t, x, RD, 5, 3.5) + txt(t, x, "#fff", 0, 0);
+// layout: [R]ik  [R]ok, with real widths
+const ikW = FS * 1.02, okW = FS * 1.16, gapAfterMark = 12, wordGap = 52;
+const r1 = 24, ikX = r1 + visW + gapAfterMark, r2 = ikX + ikW + wordGap, okX = r2 + visW + gapAfterMark;
+const totalW = Math.round(okX + okW + 24);
+const wordmark = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} 160" width="${totalW}" height="160"><style>@font-face{font-family:'RikRokDisplay';src:url(data:font/woff2;base64,${bric}) format('woff2');font-weight:200 800}</style><rect width="${totalW}" height="160" rx="24" fill="#000"/>${piece(r1, "w1")}${trioTxt("ik", ikX)}${piece(r2, "w2")}${trioTxt("ok", okX)}</svg>`;
 
 fs.mkdirSync(path.join(root, "assets"), { recursive: true });
 fs.writeFileSync(path.join(root, "assets", "icon.svg"), mark());
@@ -79,9 +95,10 @@ for (const size of [180, 512]) {
   await page.screenshot({ path: path.join(root, "server", "public", `icon-${size}.png`), clip: { x: 0, y: 0, width: size, height: size } });
   console.log(`wrote server/public/icon-${size}.png`);
 }
-await page.setViewport({ width: 640, height: 160, deviceScaleFactor: 2 });
+const wmW = Number(wordmark.match(/width="(\d+)"/)[1]);
+await page.setViewport({ width: wmW, height: 160, deviceScaleFactor: 2 });
 await page.setContent(`<html><body style="margin:0;background:#000">${wordmark}</body></html>`);
 await page.evaluateHandle("document.fonts.ready");
-await page.screenshot({ path: path.join(root, "assets", "wordmark.png"), clip: { x: 0, y: 0, width: 640, height: 160 } });
+await page.screenshot({ path: path.join(root, "assets", "wordmark.png"), clip: { x: 0, y: 0, width: wmW, height: 160 } });
 console.log("wrote assets/wordmark.png");
 await browser.close();
