@@ -1,0 +1,6 @@
+node_modules/
+.env
+*.log
+.DS_Store
+assets/demo.mp4
+assets/demo.json

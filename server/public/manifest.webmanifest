@@ -1,0 +1,14 @@
+{
+  "name": "Rik Rok",
+  "short_name": "Rik Rok",
+  "description": "Your coding-agent sessions as recap reels",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
