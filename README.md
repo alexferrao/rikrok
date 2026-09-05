@@ -91,15 +91,15 @@ The script is the only creative step. Everything after it is timing: each card s
 
 ## The reel, beat by beat
 
-Frames from the demo reel (a sample session). Every reel has this order; only the number of plays varies, two to four, and the flow beat appears only when the session changed how something moves.
+Frames from the demo reel (a sample session). Every reel has this order; only the number of plays varies, two to four, and the flow beat appears only when the session changed how something moves. Click the strip for full size.
 
-| Beat | Frame | What it shows | Where it comes from |
-|---|---|---|---|
-| **Headline** | <img src="assets/readme/beat-headline.jpg" width="160"> | The outcome up front. Project name in its fixed accent colour, the one-line result, and a score bug: minutes active, done, open. Under it, the repo path and branch. | Headline and narration from the model. Path, branch and minutes are facts from the log. |
-| **Play** (2 to 4) | <img src="assets/readme/beat-play.jpg" width="160"> | One thing that happened. A caption plus an evidence panel: files touched, commit lines, commands or a quote. Lines animate in one by one. | The model picks the plays. Evidence lines must come from the log, never invented. |
-| **How it moves** | <img src="assets/readme/beat-flow.jpg" width="160"> | The flow the session built or changed: a user action reaching an API, data written somewhere, a job firing. Nodes in the order things happen, arrows drawn in as the narration reaches them, a dot travelling each arrow, the changed parts lit in the accent. | The model returns nodes and edges backed by the session. Off with `RIKROK_FLOW=off`. |
-| **Status** | <img src="assets/readme/beat-status.jpg" width="160"> | Where it stands. Shipped in cyan with ticks, open in red with circles. If the previous recap named a next step, the narration says whether it happened. | Up to 4 shipped and 3 open items from the model; the counts feed the score bug. |
-| **Next step** | <img src="assets/readme/beat-next.jpg" width="160"> | The single next action on an accent card. Also printed under the reel in the feed, so you can act without replaying. | One action, max 60 characters, from the model. |
+<a href="assets/readme/beats.jpg"><img src="assets/readme/beats.jpg" alt="The five beats of a reel: headline, play, how it moves, status, next step" width="100%"></a>
+
+1. **Headline.** The outcome up front. Project name in its fixed accent colour, the one-line result, and a score bug: minutes active, done, open. Under it, the repo path and branch. Headline and narration come from the model; path, branch and minutes are facts from the log.
+2. **Play** (two to four). One thing that happened. A caption plus an evidence panel: files touched, commit lines, commands or a quote, animating in one by one. The model picks the plays; evidence lines must come from the log, never invented.
+3. **How it moves.** The flow the session built or changed: a user action reaching an API, data written somewhere, a job firing. Nodes in the order things happen, arrows drawn in as the narration reaches them, a dot travelling each arrow, the changed parts lit in the accent. The model returns nodes and edges backed by the session. Off with `RIKROK_FLOW=off`.
+4. **Status.** Where it stands. Shipped in cyan with ticks, open in red with circles. If the previous recap named a next step, the narration says whether it happened.
+5. **Next step.** The single next action on an accent card. Also printed under the reel in the feed, so you can act without replaying.
 
 ## What you can do on a reel
 
@@ -172,6 +172,14 @@ rikrok voice serve --fast    # the 0.6B model: smaller download, quicker, a litt
 New in 0.4.0 and lightly tested so far; please open an issue with what breaks. It needs [uv](https://docs.astral.sh/uv/) and git, downloads the model from Hugging Face on first start (about 4.5 GB, or 1.5 GB for `--fast`), and points Rik Rok at itself. `rikrok install` keeps it running at login alongside the watcher and the feed. The server is the Apache-2.0 [Qwen3-TTS OpenAI FastAPI project](https://github.com/groxaxo/Qwen3-TTS-Openai-Fastapi); on Linux and Windows it runs on PyTorch (CPU unless you set `TTS_DEVICE=cuda`).
 
 Already running something that clones? Any server that takes `ref_audio` and `ref_text` on `/v1/audio/speech` (oMLX with Qwen3-TTS, for example) works with `RIKROK_TTS_URL` and `RIKROK_CLONE_MODEL`; set `RIKROK_CLONE_API=voice-clone` for servers that use the dedicated `/v1/audio/voice-clone` endpoint instead.
+
+### One server on a Mac: oMLX
+
+If you are on Apple Silicon and want the least moving parts, run [oMLX](https://github.com/jundot/omlx) (Apache-2.0, menu-bar app). One instance serves the script model, the Qwen3-TTS cloning model and whisper for narration QA on a single port, which is how Rik Rok's author runs it.
+
+1. Install: download the `.dmg` from oMLX's releases, or `brew install jundot/omlx/omlx`. The welcome screen picks a model folder and starts the server.
+2. In oMLX's model downloader, add a chat model (for example `mlx-community/Qwen3.5-35B-A3B-4bit` if you have the memory, or a 4B to 9B Qwen3.5 otherwise), `mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16` for your voice, and a whisper model such as `whisper-large-v3-turbo`.
+3. `rikrok setup`. It finds oMLX on :8000 or :8800, copies the API key from `~/.omlx/settings.json`, picks the models it finds, and records your voice. Thinking is switched off for the script model automatically.
 
 ### Other voices
 

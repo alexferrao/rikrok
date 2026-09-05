@@ -1,6 +1,8 @@
 // rikrok setup: the guided path. Finds a local LLM (or installs Ollama), records your
 // voice, writes ~/.rikrok/config.json, renders the demo, and offers to start the feed.
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import readline from "node:readline/promises";
 import { execFileSync, spawnSync } from "node:child_process";
 import * as c from "../lib/config.mjs";
@@ -8,9 +10,20 @@ import { setup as voiceSetup, saveConfig } from "./voice.mjs";
 
 const has = (bin) => spawnSync("which", [bin]).status === 0;
 
+// oMLX keeps its API key in ~/.omlx/settings.json; the wizard copies it so nothing else needs typing.
+function omlxKey() {
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(os.homedir(), ".omlx", "settings.json"), "utf-8"));
+    return j.auth?.api_key || "";
+  } catch {
+    return "";
+  }
+}
+
 async function models(url) {
   try {
-    const r = await fetch(`${url}/v1/models`, { signal: AbortSignal.timeout(4000) });
+    const key = /:(8800|8000)$/.test(url) ? omlxKey() : "";
+    const r = await fetch(`${url}/v1/models`, { headers: key ? { Authorization: `Bearer ${key}` } : {}, signal: AbortSignal.timeout(4000) });
     if (!r.ok) return null;
     const j = await r.json();
     return (j.data || []).map((m) => m.id);
@@ -35,6 +48,7 @@ export async function run(args) {
       ["Ollama", "http://127.0.0.1:11434"],
       ["LM Studio", "http://127.0.0.1:1234"],
       ["oMLX", "http://127.0.0.1:8800"],
+      ["oMLX", "http://127.0.0.1:8000"],
       ["current setting", c.LLM_URL],
     ];
     let llmUrl = null, list = null, name = null;
@@ -78,9 +92,17 @@ export async function run(args) {
       if (name === "Ollama") cfg.RIKROK_LLM_EXTRA = { think: false };
       if (name === "oMLX") cfg.RIKROK_LLM_EXTRA = { chat_template_kwargs: { enable_thinking: false } };
       if (name === "oMLX") {
+        // One server for everything: scripts, your voice (Qwen3-TTS Base) and narration QA (whisper).
         cfg.RIKROK_TTS_URL = llmUrl;
         cfg.RIKROK_STT_URL = llmUrl;
-        cfg.RIKROK_STT_MODEL = "whisper-large-v3-turbo";
+        const key = omlxKey();
+        if (key) cfg.RIKROK_LLM_KEY = key;
+        const tts = list.find((m) => /Qwen3-TTS.*Base/i.test(m));
+        const stt = list.find((m) => /whisper/i.test(m));
+        if (tts) cfg.RIKROK_CLONE_MODEL = tts;
+        else console.log("  oMLX has no Qwen3-TTS Base model loaded yet. Add mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16 in oMLX, then `rikrok voice setup`.");
+        if (stt) cfg.RIKROK_STT_MODEL = stt;
+        else delete cfg.RIKROK_STT_URL;
       }
     } else {
       console.log("Skipping the LLM for now: reels will use the template script until you set RIKROK_LLM_MODEL.");
