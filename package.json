@@ -7,7 +7,7 @@
   "author": "Alex Ferrao",
   "repository": {
     "type": "git",
-    "url": "https://github.com/alexferrao/rikrok"
+    "url": "git+https://github.com/alexferrao/rikrok.git"
   },
   "homepage": "https://github.com/alexferrao/rikrok#readme",
   "keywords": [
