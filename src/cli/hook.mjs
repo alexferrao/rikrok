@@ -8,7 +8,7 @@ import { spawn } from "node:child_process";
 import { BIN, LOG_DIR, RIKROK_HOME, ensureDirs } from "../lib/config.mjs";
 
 const SETTINGS = path.join(os.homedir(), ".claude", "settings.json");
-const MARK = "rikrok hook run";
+const isOurs = (entry) => Array.isArray(entry?.hooks) && entry.hooks.some((h) => /rikrok(\.mjs)?"? hook run/.test(String(h.command || "")));
 
 function readSettings() {
   try {
@@ -22,7 +22,7 @@ export function install() {
   const s = readSettings();
   s.hooks = s.hooks || {};
   const list = (s.hooks.SessionEnd = s.hooks.SessionEnd || []);
-  if (JSON.stringify(list).includes(MARK)) {
+  if (list.some(isOurs)) {
     console.log("already installed");
     return 0;
   }
@@ -38,7 +38,10 @@ export function uninstall() {
   const s = readSettings();
   const list = s.hooks?.SessionEnd;
   if (!Array.isArray(list)) return 0;
-  s.hooks.SessionEnd = list.filter((e) => !JSON.stringify(e).includes(MARK));
+  const kept = list.filter((e) => !isOurs(e));
+  if (kept.length) s.hooks.SessionEnd = kept;
+  else delete s.hooks.SessionEnd;
+  if (!Object.keys(s.hooks).length) delete s.hooks;
   fs.writeFileSync(SETTINGS, JSON.stringify(s, null, 2) + "\n");
   console.log("removed");
   return 0;
