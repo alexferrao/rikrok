@@ -73,6 +73,9 @@ export const CLONE_MODEL = env("RIKROK_CLONE_MODEL", "Qwen3-TTS-12Hz-1.7B-Base-b
 export const CLONE_API = env("RIKROK_CLONE_API", "speech");
 export const VOICE_SERVER_DIR = path.join(RIKROK_HOME, "voice-server");
 export const VOICE_SERVER_PORT = num("RIKROK_VOICE_PORT", 4873);
+// Vocal isolation for `voice from-clip --vocals`: an HTTP stem service or a shell template
+export const STEMS_URL = env("RIKROK_STEMS_URL", "");
+export const STEMS_CMD = env("RIKROK_STEMS_CMD", "");
 
 // Optional transcribe-back QA of narration (off unless RIKROK_STT_URL is set)
 export const STT_URL = env("RIKROK_STT_URL", "") ? base(env("RIKROK_STT_URL")) : "";

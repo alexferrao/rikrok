@@ -6,7 +6,10 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { execFileSync, spawnSync } from "node:child_process";
 import { RIKROK_HOME, VOICE_DIR, CLONE_REF, CLONE_TEXT, CONFIG_FILE, TTS_URL, VOICE_SERVER_DIR, VOICE_SERVER_PORT, ensureDirs } from "../lib/config.mjs";
-import { cloneVoice } from "../voices/clone.mjs";
+import { cloneVoice, profilePaths } from "../voices/clone.mjs";
+import { transcribeWords, sttEnabled } from "../lib/stt.mjs";
+import { loadVoice } from "../voices/index.mjs";
+import { STEMS_CMD, STEMS_URL } from "../lib/config.mjs";
 
 // Short, neutral, covers most English sounds, easy to read in one breath per line.
 export const SCRIPT = [
@@ -179,6 +182,123 @@ export async function serve(args) {
   return child.status ?? 0;
 }
 
+
+// ---- rikrok voice from-clip <file> --name <profile> [--start s] [--end s] [--vocals] [--text "..."] ----
+// Turn a recording of yourself (spoken or sung) into a named voice profile: cut the segment,
+// optionally isolate the vocals, transcribe it so the clone knows the words, store both.
+export async function fromClip(args) {
+  const src = args._[1] ? path.resolve(String(args._[1])) : null;
+  if (!src || !fs.existsSync(src)) {
+    console.error("usage: rikrok voice from-clip <audio-or-video> --name <profile> [--start 12 --end 32] [--vocals] [--text \"what is sung\"]");
+    return 1;
+  }
+  const name = String(args.name || "clip");
+  const { ref, text, dir } = profilePaths(name);
+  fs.mkdirSync(dir, { recursive: true });
+  const cut = path.join(dir, "cut.wav");
+  const seg = [];
+  if (args.start !== undefined) seg.push("-ss", String(args.start));
+  if (args.end !== undefined) seg.push("-to", String(args.end));
+  console.log(`[voice] cutting ${path.basename(src)}${seg.length ? ` (${args.start ?? 0}s to ${args.end ?? "end"})` : ""}`);
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", ...seg, "-i", src, "-vn", "-ar", "24000", "-ac", "1", cut]);
+  let voice = cut;
+  if (args.vocals) {
+    console.log("[voice] isolating vocals");
+    const vox = path.join(dir, "vocals.wav");
+    const ok = await isolateVocals(cut, vox);
+    if (ok) voice = vox;
+    else console.log("[voice] no stem separator configured (RIKROK_STEMS_URL or RIKROK_STEMS_CMD); using the mix as is");
+  }
+  const dur = Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", voice]).toString());
+  if (dur > 30) console.log(`[voice] clip is ${dur.toFixed(0)}s; 10 to 25 s works best. Use --start/--end to pick the cleanest stretch.`);
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", voice, "-af", "loudnorm=I=-20:TP=-1.5:LRA=9", "-ar", "24000", "-ac", "1", ref]);
+  let transcript = typeof args.text === "string" ? args.text : "";
+  if (!transcript) {
+    if (!sttEnabled()) {
+      console.error("[voice] no transcriber (RIKROK_STT_URL) and no --text given; the clone needs the words. Pass --text \"...\".");
+      return 1;
+    }
+    console.log("[voice] transcribing");
+    const words = await transcribeWords(ref);
+    transcript = words.map((w) => w.w).join(" ").replace(/\s+([,.!?])/g, "$1").trim();
+    if (!transcript) {
+      console.error("[voice] transcriber returned nothing; pass --text \"...\" with the words.");
+      return 1;
+    }
+  }
+  fs.writeFileSync(text, transcript + "\n");
+  console.log(`[voice] profile "${name}" saved in ${dir}\n  words: ${transcript.slice(0, 160)}${transcript.length > 160 ? "…" : ""}`);
+  const v = cloneVoice(name);
+  const a = await v.available();
+  if (!a.ok) {
+    console.log(`[voice] cloning server not reachable (${a.reason}); profile saved, test later with: rikrok voice say "hello" --voice clone:${name}`);
+    return 0;
+  }
+  const testPath = path.join(dir, "test.wav");
+  const r = await v.synth(typeof args.say === "string" ? args.say : "This is the new voice, from the clip you gave me.", testPath);
+  if (!r.ok) {
+    console.log(`[voice] test synthesis failed: ${r.error}`);
+    return 1;
+  }
+  console.log(`[voice] test line: ${testPath}`);
+  play(testPath);
+  console.log(`\nUse it: RIKROK_VOICE=clone:${name}   (or --voice clone:${name} with \`rikrok voice say\`)`);
+  return 0;
+}
+
+// Vocal isolation through whatever you have: an HTTP stem service (RIKROK_STEMS_URL, POST the
+// file, get vocals back) or a shell command template (RIKROK_STEMS_CMD with {in} and {out}).
+async function isolateVocals(inPath, outPath) {
+  if (STEMS_URL) {
+    try {
+      const fd = new FormData();
+      fd.append("file", new Blob([fs.readFileSync(inPath)]), "clip.wav");
+      const r = await fetch(STEMS_URL, { method: "POST", body: fd, signal: AbortSignal.timeout(600_000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      fs.writeFileSync(outPath, Buffer.from(await r.arrayBuffer()));
+      return true;
+    } catch (e) {
+      console.log(`[voice] stem service failed: ${e.message}`);
+      return false;
+    }
+  }
+  if (STEMS_CMD) {
+    try {
+      execFileSync("sh", ["-c", STEMS_CMD.replaceAll("{in}", JSON.stringify(inPath)).replaceAll("{out}", JSON.stringify(outPath))], { stdio: "inherit" });
+      return fs.existsSync(outPath);
+    } catch (e) {
+      console.log(`[voice] stem command failed: ${e.message}`);
+      return false;
+    }
+  }
+  return false;
+}
+
+// ---- rikrok voice say "<text>" [--voice clone:<profile>] [--out file.wav] ----
+export async function say(args) {
+  const text = args._.slice(1).join(" ");
+  if (!text) {
+    console.error('usage: rikrok voice say "the line" [--voice clone:singing] [--out line.wav]');
+    return 1;
+  }
+  const v = await loadVoice(typeof args.voice === "string" ? args.voice : undefined);
+  const a = await v.available();
+  if (!a.ok) {
+    console.log(`${v.name} not available: ${a.reason}`);
+    return 1;
+  }
+  const out = path.resolve(typeof args.out === "string" ? args.out : path.join(VOICE_DIR, "say.wav"));
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  const r = await v.synth(text, out);
+  if (!r.ok) {
+    console.log(`synthesis failed: ${r.error}`);
+    return 1;
+  }
+  console.log(`ok, ${out}`);
+  if (!args.quiet) play(out);
+  return 0;
+}
+
 export async function test() {
   const v = cloneVoice();
   const a = await v.available();
@@ -201,6 +321,8 @@ export async function run(args) {
   const sub = args._[0] || "help";
   if (sub === "setup") return setup(args);
   if (sub === "test") return test();
+  if (sub === "from-clip") return fromClip(args);
+  if (sub === "say") return say(args);
   if (sub === "serve") return serve(args);
   if (sub === "install-server") return installServer() ? 0 : 1;
   if (sub === "devices") {
@@ -209,6 +331,6 @@ export async function run(args) {
     d.forEach((x) => console.log(`${x.index}  ${x.name}`));
     return 0;
   }
-  console.log("usage: rikrok voice setup [--file clip.wav --text \"what is said\"] [--device N] [--seconds 22] | test | devices | serve [--fast] [--port N] | install-server");
+  console.log("usage: rikrok voice setup [--file clip.wav --text \"what is said\"] [--device N] [--seconds 22] | from-clip <file> --name <profile> [--start s --end s] [--vocals] | say \"line\" [--voice clone:<profile>] [--out f.wav] | test | devices | serve [--fast] [--port N] | install-server");
   return 1;
 }

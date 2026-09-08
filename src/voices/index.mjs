@@ -11,11 +11,12 @@ import { moduleVoice } from "./module.mjs";
 import { silentVoice } from "./none.mjs";
 import { cloneVoice } from "./clone.mjs";
 
-export const VOICE_SPECS = ["clone", "say:<Voice>", "openai-speech:<voice>", "module:<path>", "none"];
+export const VOICE_SPECS = ["clone", "clone:<profile>", "say:<Voice>", "openai-speech:<voice>", "module:<path>", "none"];
 
 export async function loadVoice(spec = VOICE) {
   if (spec === "none") return silentVoice();
   if (spec === "clone") return cloneVoice();
+  if (spec.startsWith("clone:")) return cloneVoice(spec.slice(6));
   if (spec === "say") return saySpeech();
   if (spec.startsWith("say:")) return saySpeech(spec.slice(4));
   if (spec === "openai-speech") return openaiSpeech();

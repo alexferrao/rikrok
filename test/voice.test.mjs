@@ -18,3 +18,12 @@ test("the recording script is short enough to read in one go", () => {
   const words = SCRIPT.join(" ").split(/\s+/).length;
   assert.ok(words >= 30 && words <= 60, `${words} words`);
 });
+
+test("clone:<profile> resolves to its own folder", async () => {
+  const { profilePaths } = await import("../src/voices/clone.mjs");
+  const p = profilePaths("singing");
+  assert.match(p.ref, /voice\/profiles\/singing\/ref\.wav$/);
+  assert.match(profilePaths("../evil").dir, /profiles\/\.\._evil$/);
+  const v = await loadVoice("clone:singing");
+  assert.equal(v.name, "clone:singing");
+});

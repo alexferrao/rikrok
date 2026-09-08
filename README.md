@@ -152,8 +152,9 @@ Environment variables, or the same keys in `~/.rikrok/config.json`. `rikrok conf
 | `RIKROK_LLM_KEY` | unset | Bearer token if your server wants one |
 | `RIKROK_LLM_EXTRA` | `{}` | JSON merged into every chat request, e.g. `{"think":false}` (Ollama) or `{"chat_template_kwargs":{"enable_thinking":false}}` (oMLX, vLLM) |
 | `RIKROK_FLOW` | `on` | `off` drops the "how it moves" beat |
-| `RIKROK_VOICE` | `say:Samantha` on macOS, else `none` | `clone` (your voice), `say:<Voice>`, `openai-speech:<voice>`, `module:<path>`, `none` |
+| `RIKROK_VOICE` | `say:Samantha` on macOS, else `none` | `clone` (your voice), `clone:<profile>` (a voice from `from-clip`), `say:<Voice>`, `openai-speech:<voice>`, `module:<path>`, `none` |
 | `RIKROK_CLONE_REF` / `_TEXT` / `_MODEL` | `~/.rikrok/voice/ref.wav`, `ref.txt`, `Qwen3-TTS-12Hz-1.7B-Base-bf16` | Reference clip, its transcript, and the cloning model on your speech server |
+| `RIKROK_STEMS_URL` / `RIKROK_STEMS_CMD` | unset | Vocal isolation for `voice from-clip --vocals`: an HTTP stem service, or a shell template with `{in}` and `{out}` |
 | `RIKROK_CLONE_API` | `speech` | `voice-clone` for servers with a dedicated `/v1/audio/voice-clone` endpoint (set by `rikrok voice serve`) |
 | `RIKROK_VOICE_PORT` | `4873` | Port for `rikrok voice serve` |
 | `RIKROK_TTS_URL` / `_MODEL` / `_KEY` | LLM URL, `tts-1` | For `openai-speech`: any `/v1/audio/speech` server (Kokoro-FastAPI, oMLX Qwen3-TTS, LM Studio) |
@@ -187,6 +188,18 @@ rikrok voice serve --fast    # the 0.6B model: smaller download, quicker, a litt
 New in 0.4.0 and lightly tested so far; please open an issue with what breaks. It needs [uv](https://docs.astral.sh/uv/) and git, downloads the model from Hugging Face on first start (about 4.5 GB, or 1.5 GB for `--fast`), and points Rik Rok at itself. `rikrok install` keeps it running at login alongside the watcher and the feed. The server is the Apache-2.0 [Qwen3-TTS OpenAI FastAPI project](https://github.com/groxaxo/Qwen3-TTS-Openai-Fastapi); on Linux and Windows it runs on PyTorch (CPU unless you set `TTS_DEVICE=cuda`).
 
 Already running something that clones? Any server that takes `ref_audio` and `ref_text` on `/v1/audio/speech` (oMLX with Qwen3-TTS, for example) works with `RIKROK_TTS_URL` and `RIKROK_CLONE_MODEL`; set `RIKROK_CLONE_API=voice-clone` for servers that use the dedicated `/v1/audio/voice-clone` endpoint instead.
+
+### More voices from clips you already have
+
+Any recording of you can become a named voice, including you singing:
+
+```bash
+rikrok voice from-clip song.m4a --name singing --start 42 --end 64 --vocals
+rikrok voice say "We can just keep Rik Rok-ing." --voice clone:singing --out line.wav
+RIKROK_VOICE=clone:singing rikrok demo
+```
+
+`from-clip` cuts the segment, optionally isolates the vocals, transcribes it so the clone knows the words that were sung, normalises the level, and stores the pair under `~/.rikrok/voice/profiles/<name>`. Ten to twenty-five seconds of clean voice works best. `--vocals` needs a stem separator: point `RIKROK_STEMS_URL` at an HTTP service that takes a file and returns the vocal stem, or `RIKROK_STEMS_CMD` at a command template with `{in}` and `{out}` (for example a local Demucs wrapper). Without one the mix is used as is, which is fine for a cappella or a clean vocal take. Pass `--text "..."` to skip transcription. Your recordings only: this is for your voice.
 
 ### One server on a Mac: oMLX
 
