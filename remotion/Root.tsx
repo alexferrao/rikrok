@@ -6,6 +6,7 @@ import "@fontsource/spectral/600.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/600.css";
 import { Reel } from "./Reel";
+import { Pitch, PitchProps } from "./Pitch";
 import { theme, ReelProps } from "./theme";
 
 const defaultProps: ReelProps = {
@@ -57,7 +58,11 @@ const defaultProps: ReelProps = {
   totalFrames: 620,
 };
 
+const pitchDefaults: PitchProps = { kind: "pain", label: "The problem", lines: ["Six sessions.", "No idea what", "*any* of them did."], audioFile: "silence.wav", totalFrames: 300 };
+
 export const RemotionRoot: React.FC = () => (
+  <>
+  <Composition id="Pitch" component={Pitch} width={theme.canvas.width} height={theme.canvas.height} fps={theme.canvas.fps} durationInFrames={300} defaultProps={pitchDefaults} calculateMetadata={({ props }) => ({ durationInFrames: props.totalFrames })} />
   <Composition
     id="Reel"
     component={Reel}
@@ -68,4 +73,5 @@ export const RemotionRoot: React.FC = () => (
     defaultProps={defaultProps}
     calculateMetadata={({ props }) => ({ durationInFrames: props.totalFrames })}
   />
+  </>
 );
