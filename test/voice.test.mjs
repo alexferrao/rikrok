@@ -23,7 +23,7 @@ test("clone:<profile> resolves to its own folder", async () => {
   const { profilePaths } = await import("../src/voices/clone.mjs");
   const p = profilePaths("singing");
   assert.match(p.ref, /voice\/profiles\/singing\/ref\.wav$/);
-  assert.match(profilePaths("../evil").dir, /profiles\/\.\._evil$/);
+  assert.match(profilePaths("../evil").dir, /profiles\/___evil$/);
   const v = await loadVoice("clone:singing");
   assert.equal(v.name, "clone:singing");
 });
