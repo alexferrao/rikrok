@@ -8,6 +8,8 @@ Imagine if your recaps came at you the same way you doomscroll.
 
 Welcome to Rik Rok.
 
+<p align="center"><a href="https://github.com/alexferrao/rikrok/releases/tag/v0.5.0"><img src="assets/readme/pitch.gif" alt="Rik Rok in 51 seconds: the problem, the idea, your own voice, the proof, install" width="360"></a></p>
+
 Rik Rok watches your coding-agent sessions. When one goes idle after real work, it writes a 30 to 45 second news-style recap, narrates it in your own voice, renders a vertical reel, and drops it into a swipe feed on your phone. Every reel ends with the single next step for that project, and when the session changed how something moves, the reel shows the flow. Reply to a reel and the comment can go straight back to the agent.
 
 Everything runs on your machine. Sessions are read from disk, scripts come from a local LLM, narration from a 20-second recording of you, rendering from Remotion. No cloud, no accounts, no telemetry. Your voice never leaves the machine.
