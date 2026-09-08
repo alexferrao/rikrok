@@ -6,8 +6,10 @@ const { colors, fonts, safe } = theme;
 const easeEnter = Easing.bezier(0.16, 1, 0.3, 1);
 
 export type PitchKind = "pain" | "idea" | "voice" | "proof" | "cta";
+export type Word = { text: string; start: number; end: number }; // frames
 export type PitchProps = {
   kind: PitchKind;
+  words?: Word[]; // narration, word-timed, for captions
   label: string; // small mono label, top
   lines: string[]; // the statement, one array item per line, "*word*" highlights in cyan
   sub?: string; // smaller line under the statement
@@ -204,6 +206,42 @@ const Cta: React.FC = () => {
   );
 };
 
+// Captions: the current phrase (5 to 7 words) at the bottom, the spoken word lit.
+const Captions: React.FC<{ words: Word[]; accent: string }> = ({ words, accent }) => {
+  const f = useCurrentFrame();
+  if (!words.length) return null;
+  // phrases: cut every 6 words, or at sentence punctuation
+  const phrases: Word[][] = [];
+  let cur: Word[] = [];
+  for (const w of words) {
+    cur.push(w);
+    if (cur.length >= 6 || /[.!?]$/.test(w.text)) {
+      phrases.push(cur);
+      cur = [];
+    }
+  }
+  if (cur.length) phrases.push(cur);
+  const phrase = phrases.find((p) => f >= p[0].start - 4 && f <= p[p.length - 1].end + 8) ?? (f < words[0].start ? null : null);
+  if (!phrase) return null;
+  const inT = interpolate(f, [phrase[0].start - 4, phrase[0].start + 4], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  return (
+    <div style={{ position: "absolute", left: safe.x, right: safe.x, bottom: safe.bottom + 40, textAlign: "center", opacity: inT }}>
+      <div style={{ display: "inline-block", padding: "18px 30px", borderRadius: 18, background: "rgba(0,0,0,0.72)", fontFamily: fonts.display, fontWeight: 700, fontSize: 46, lineHeight: 1.25, color: colors.text, textWrap: "balance" as never }}>
+        {phrase.map((w, i) => {
+          const on = f >= w.start && f < w.end + 2;
+          const done = f >= w.end + 2;
+          return (
+            <span key={i} style={{ color: on ? accent : done ? colors.text : colors.textDim, transition: "none" }}>
+              {w.text}
+              {i < phrase.length - 1 ? " " : ""}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 export const Pitch: React.FC<PitchProps> = (props) => {
   const accent = props.accent ?? colors.cyan;
   const f = useCurrentFrame();
@@ -229,6 +267,7 @@ export const Pitch: React.FC<PitchProps> = (props) => {
         {props.kind === "proof" && <MiniFlow accent={accent} />}
         {props.kind === "cta" && <Cta />}
       </div>
+      <Captions words={props.words ?? []} accent={accent} />
     </AbsoluteFill>
   );
 };
