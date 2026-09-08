@@ -9,6 +9,7 @@ import { REMOTION_DIR, BUNDLE_DIR, WORK_DIR, ensureDirs } from "../src/lib/confi
 import { narrateBeats } from "../src/lib/narrate.mjs";
 
 const outDir = path.resolve(process.argv[2] || "assets/pitch");
+const only = process.argv[3] ? process.argv[3].split(",") : null; // e.g. "cta" or "pain,cta"
 fs.mkdirSync(outDir, { recursive: true });
 ensureDirs();
 const FPS = 30;
@@ -21,22 +22,24 @@ const CLIPS = [
   { id: "pitch-5-cta", kind: "cta", label: "", lines: [], narration: "Rik Rok. Open source, MIT, local-first. npm install rikrok, run setup, and your next session recaps itself.", minSec: 9 },
 ];
 
+const PITCH_BUNDLE = path.join(BUNDLE_DIR, "pitch");
 const serveUrl = await ensureBundle();
 for (const c of CLIPS) {
+  if (only && !only.includes(c.kind)) continue;
   const work = path.join(WORK_DIR, c.id);
   fs.mkdirSync(work, { recursive: true });
   console.log(`[pitch] ${c.id}: narrating`);
   const n = await narrateBeats([c.narration], work);
   const totalFrames = Math.round(Math.max(c.minSec, n.totalDuration + 1.2) * FPS);
   const audioFile = `narration-${c.id}.wav`;
-  fs.mkdirSync(path.join(BUNDLE_DIR, "public"), { recursive: true });
-  fs.copyFileSync(n.audioPath, path.join(BUNDLE_DIR, "public", audioFile));
+  fs.mkdirSync(path.join(PITCH_BUNDLE, "public"), { recursive: true });
+  fs.copyFileSync(n.audioPath, path.join(PITCH_BUNDLE, "public", audioFile));
   const inputProps = { kind: c.kind, label: c.label, lines: c.lines, audioFile, totalFrames };
   const composition = await selectComposition({ serveUrl, id: "Pitch", inputProps, browserExecutable: process.env.RIKROK_BROWSER || null });
   const outPath = path.join(outDir, `${c.id}.mp4`);
   console.log(`[pitch] ${c.id}: rendering ${totalFrames} frames`);
   await renderMedia({ composition, serveUrl, codec: "h264", outputLocation: outPath, inputProps, concurrency: 4, audioCodec: "aac", browserExecutable: process.env.RIKROK_BROWSER || null });
-  fs.rmSync(path.join(BUNDLE_DIR, "public", audioFile), { force: true });
+  fs.rmSync(path.join(PITCH_BUNDLE, "public", audioFile), { force: true });
   fs.writeFileSync(outPath.replace(/\.mp4$/, ".json"), JSON.stringify({ id: c.id, source: "pitch", project: "Rik Rok", sessionId: c.id, createdAt: new Date(Date.now() - (5 - CLIPS.indexOf(c)) * 60_000).toISOString(), durationSec: Math.round(totalFrames / FPS), headline: `Rik Rok: ${c.label || "install"}`, next_step: c.kind === "cta" ? "npm install -g rikrok" : c.lines.join(" ").replace(/\*/g, ""), accentColor: "#69C9D0", watched: false, sourcePath: null, where: "pitch", achieved: [], open: [], commits: [], urls: ["https://github.com/alexferrao/rikrok"], scriptSource: "hand", voice: n.voice, silent: n.silent, sessionFile: null, resumeHint: null, coveredLines: null }, null, 2));
   fs.rmSync(work, { recursive: true, force: true });
   console.log(`[pitch] done ${outPath} (${Math.round(totalFrames / FPS)}s)`);
@@ -44,7 +47,5 @@ for (const c of CLIPS) {
 
 async function ensureBundle() {
   await ensureBrowser({ browserExecutable: process.env.RIKROK_BROWSER || null });
-  return bundle({ entryPoint: path.join(REMOTION_DIR, "index.ts"), outDir: path.join(BUNDLE_DIR, "pitch"), publicDir: path.join(REMOTION_DIR, "public") }).then((u) => {
-    return u;
-  });
+  return bundle({ entryPoint: path.join(REMOTION_DIR, "index.ts"), outDir: PITCH_BUNDLE, publicDir: path.join(REMOTION_DIR, "public") });
 }

@@ -181,16 +181,25 @@ const MiniFlow: React.FC<{ accent: string }> = ({ accent }) => {
 const Cta: React.FC = () => {
   const f = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const s = spring({ frame: f - 6, fps, config: { damping: 14, stiffness: 120 } });
-  const t2 = useIn(30, 16);
+  // 1. the mark alone, springs in
+  const markIn = spring({ frame: f - 4, fps, config: { damping: 14, stiffness: 120 } });
+  // 2. at ~1.3 s the mark fades and shrinks while the wordmark grows out of the same spot
+  const swap = interpolate(f, [38, 66], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: easeEnter });
+  const markOpacity = 1 - swap;
+  const markScale = markIn * (1 - swap * 0.35);
+  const wordScale = 0.55 + swap * 0.45;
+  // 3. the install line after the wordmark settles
+  const t3 = useIn(74, 16);
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 50, marginTop: 20 }}>
-      <Img src={staticFile("mark.png")} style={{ width: 360, height: 360, borderRadius: 70, transform: `scale(${s})` }} />
-      <Img src={staticFile("wordmark.png")} style={{ width: 800, opacity: t2 }} />
-      <div style={{ opacity: t2, fontFamily: fonts.mono, fontSize: 40, color: colors.text, background: colors.panel, border: `2px solid ${colors.line}`, borderRadius: 16, padding: "22px 40px" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 120 }}>
+      <div style={{ position: "relative", width: 900, height: 420, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Img src={staticFile("mark.png")} style={{ position: "absolute", width: 380, height: 380, borderRadius: 74, opacity: markOpacity, transform: `scale(${markScale})` }} />
+        <Img src={staticFile("wordmark.png")} style={{ position: "absolute", width: 900, opacity: swap, transform: `scale(${wordScale})` }} />
+      </div>
+      <div style={{ marginTop: 40, opacity: t3, transform: `translateY(${(1 - t3) * 20}px)`, fontFamily: fonts.mono, fontSize: 40, color: colors.text, background: colors.panel, border: `2px solid ${colors.line}`, borderRadius: 16, padding: "22px 40px" }}>
         $ npm install -g rikrok
       </div>
-      <div style={{ opacity: t2, fontFamily: fonts.mono, fontSize: 26, letterSpacing: "0.14em", color: colors.textDim }}>OPEN SOURCE · MIT · LOCAL-FIRST</div>
+      <div style={{ marginTop: 34, opacity: t3, fontFamily: fonts.mono, fontSize: 26, letterSpacing: "0.14em", color: colors.textDim }}>OPEN SOURCE · MIT · LOCAL-FIRST</div>
     </div>
   );
 };
@@ -204,10 +213,10 @@ export const Pitch: React.FC<PitchProps> = (props) => {
   return (
     <AbsoluteFill style={{ background: colors.bg, opacity: out }}>
       <Audio src={staticFile(props.audioFile)} />
-      <div style={{ position: "absolute", top: safe.top - 20, left: safe.x, right: safe.x, display: "flex", alignItems: "center", gap: 18, fontFamily: fonts.mono, fontSize: 24, letterSpacing: "0.14em", color: colors.textDim }}>
+      {props.kind !== "cta" && <div style={{ position: "absolute", top: safe.top - 20, left: safe.x, right: safe.x, display: "flex", alignItems: "center", gap: 18, fontFamily: fonts.mono, fontSize: 24, letterSpacing: "0.14em", color: colors.textDim }}>
         <Img src={staticFile("mark.png")} style={{ width: 44, height: 44, borderRadius: 10 }} />
         <span>RIK ROK</span>
-      </div>
+      </div>}
       <div style={{ position: "absolute", top, left: safe.x, right: safe.x }}>
         {props.kind !== "cta" && <Label text={props.label} accent={accent} />}
         {props.kind !== "cta" && <Statement lines={props.lines} accent={accent} size={props.kind === "voice" ? 92 : 96} />}
